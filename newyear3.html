@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>2026 丙午马年 · 丰盈之约</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: "PingFang SC", sans-serif; }
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: none; transition: opacity 1s;
+        }
+        #instruction { color: rgba(255,255,255,0.6); font-size: 14px; letter-spacing: 2px; bottom: 20%; position: absolute; }
+        #quote-container {
+            position: absolute; width: 80%; text-align: center; color: #fff;
+            opacity: 0; transition: opacity 1.5s; top: 50%; transform: translateY(-50%);
+        }
+        .quote-text { font-size: 18px; line-height: 1.8; font-weight: 300; letter-spacing: 1px; }
+        .quote-author { font-size: 12px; margin-top: 20px; color: #FFD700; opacity: 0.8; }
+        #horse-icon { position: absolute; top: 30px; width: 40px; opacity: 0.5; filter: invert(1); }
+        /* 点击时的波纹提示 */
+        .tap-hint { border: 1px solid rgba(255,215,0,0.4); border-radius: 50%; position: absolute; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { width: 0; height: 0; opacity: 1; } 100% { width: 100px; height: 100px; opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <img id="horse-icon" src="https://img.icons8.com/ios/100/null/horse-filled.png" alt="Horse">
+        <div id="instruction">—— 轻触屏幕 · 开启丰盈 ——</div>
+        <div id="quote-container">
+            <div class="quote-text" id="text-content"></div>
+            <div class="quote-author">《幸福不在于拥有》- 克里希那穆提</div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 1. 内容库 ---
+        const BLESSINGS = [
+            { text: "“空掉的心才是美的，在那份寂静中，美自然显现。”", color: 0x4466FF, type: "spiral" },
+            { text: "“真正的幸福在于你不再成为任何人的时候，那是唯一的自由。”", color: 0xFFD700, type: "burst" },
+            { text: "“爱不是一桩交易，它是一种存在的状态。”", color: 0xFF5577, type: "pulse" },
+            { text: "“真理是无路之国。不要跟随任何人，包括我。”", color: 0x55FFBB, type: "chaos" },
+            { text: "“当心不再有任何期待，生命便会带来无限的宝藏。”", color: 0xFFFFFF, type: "expand" }
+        ];
+
+        // --- 2. 场景初始化 ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        camera.position.z = 20;
+
+        // --- 3. 粒子系统 ---
+        const P_COUNT = 10000;
+        const geo = new THREE.BufferGeometry();
+        const pos = new Float32Array(P_COUNT * 3);
+        const colors = new Float32Array(P_COUNT * 3);
+        
+        // 初始位置：聚集在中心的一个微小核心
+        for(let i=0; i<P_COUNT*3; i++) pos[i] = (Math.random()-0.5) * 2;
+        
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const mat = new THREE.PointsMaterial({
+            size: 0.08,
+            vertexColors: true,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const points = new THREE.Points(geo, mat);
+        scene.add(points);
+
+        // --- 4. 状态控制 ---
+        let currentState = "wait"; 
+        let targetPositions = new Float32Array(P_COUNT * 3);
+        let currentTargetColor = new THREE.Color(0xFFD700);
+
+        function updateTarget(type, color) {
+            currentTargetColor.set(color);
+            const positions = geo.attributes.position.array;
+            const colorsArr = geo.attributes.color.array;
+
+            for (let i = 0; i < P_COUNT; i++) {
+                const i3 = i * 3;
+                let tx, ty, tz;
+
+                if (type === "spiral") {
+                    const angle = i * 0.1;
+                    const r = i * 0.002 * 5;
+                    tx = Math.cos(angle) * r;
+                    ty = Math.sin(angle) * r;
+                    tz = (Math.random()-0.5) * 5;
+                } else if (type === "burst") {
+                    const r = 10 + Math.random() * 5;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.random() * Math.PI;
+                    tx = r * Math.sin(phi) * Math.cos(theta);
+                    ty = r * Math.sin(phi) * Math.sin(theta);
+                    tz = r * Math.cos(phi);
+                } else {
+                    tx = (Math.random()-0.5) * 30;
+                    ty = (Math.random()-0.5) * 30;
+                    tz = (Math.random()-0.5) * 10;
+                }
+                targetPositions[i3] = tx;
+                targetPositions[i3+1] = ty;
+                targetPositions[i3+2] = tz;
+            }
+        }
+
+        // --- 5. 交互逻辑 (支持触控) ---
+        function trigger() {
+            const randomIdx = Math.floor(Math.random() * BLESSINGS.length);
+            const selected = BLESSINGS[randomIdx];
+            
+            // UI 更新
+            document.getElementById('instruction').style.opacity = '0';
+            const container = document.getElementById('quote-container');
+            container.style.opacity = '0';
+            
+            setTimeout(() => {
+                document.getElementById('text-content').innerText = selected.text;
+                container.style.opacity = '1';
+            }, 800);
+
+            // 粒子更新
+            updateTarget(selected.type, selected.color);
+            currentState = "animate";
+        }
+
+        // 绑定点击和触摸
+        window.addEventListener('pointerdown', (e) => {
+            trigger();
+        });
+
+        // --- 6. 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const positions = geo.attributes.position.array;
+            const colorsArr = geo.attributes.color.array;
+
+            for (let i = 0; i < P_COUNT; i++) {
+                const i3 = i * 3;
+                // 平滑插值移动
+                positions[i3] += (targetPositions[i3] - positions[i3]) * 0.05;
+                positions[i3+1] += (targetPositions[i3+1] - positions[i3+1]) * 0.05;
+                positions[i3+2] += (targetPositions[i3+2] - positions[i3+2]) * 0.05;
+
+                // 颜色渐变
+                colorsArr[i3] += (currentTargetColor.r - colorsArr[i3]) * 0.03;
+                colorsArr[i3+1] += (currentTargetColor.g - colorsArr[i3+1]) * 0.03;
+                colorsArr[i3+2] += (currentTargetColor.b - colorsArr[i3+2]) * 0.03;
+            }
+
+            geo.attributes.position.needsUpdate = true;
+            geo.attributes.color.needsUpdate = true;
+            
+            points.rotation.y += 0.002;
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // 窗口自适应
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
